@@ -3,122 +3,153 @@ import astropy
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from waveFunctions import wavelet, wave_signif
 
 
-class lc_reader:
-    def __init__(self, path):
-        # hdul = fits.open("GRB090510/msec128.lc")
-        self.hdul = fits.open(path)
+def lc_reader(path, plot=True, returns=False):
+    # read fits file with given path
+    hdul = fits.open(path)
 
-        # getting trigger time from header
-        self.trigger_t = self.hdul[1].header["TRIGTIME"]
+    # Getting info from header
+    trigger_t = hdul[1].header["TRIGTIME"]  # trigger time
+    NGOODPIX = hdul[1].header["NGOODPIX"]  # NGOODPIX value
 
-        # we need to multuply the count rates with NGOODPIX value
-        # its a must EXPLAIN IT LATER
+    # creating dataframe to work on the data better
+    df = pd.DataFrame(hdul[1].data)
 
-        self.NGOODPIX = self.hdul[1].header["NGOODPIX"]
+    # fixing time values, making trigger at 0
+    df["TIME"] = df["TIME"] - trigger_t  # time values
 
-        # creating dataframe to work on the data better
-        self.df = pd.DataFrame(self.hdul[1].data)
+    count = df["RATE"]  # count values
+    error = df["ERROR"]  # error values
 
-        # time values
-        self.df["TIME"] = self.df["TIME"] - self.trigger_t
+    # set time as index of DF
+    count.index = df["TIME"]
+    error.index = df["TIME"]
 
-        # count values
-        self.count = self.df["RATE"]
-        self.count.index = self.df["TIME"]
+    # we need to multuply the count rates with NGOODPIX value
+    # in order to get the real values, its a must
+    count = count * NGOODPIX
+    error = error * NGOODPIX
 
-        # error values
-        self.error = self.df["ERROR"]
-        self.error.index = self.df["TIME"]
+    # filtering between -20 and 20 sec
+    count = count[(-20 < count.index) & (count.index < 20)]
+    error = error[(-20 < error.index) & (error.index < 20)]
 
-        self.count = self.count * self.NGOODPIX
-        self.error = self.error * self.NGOODPIX
+    # creating new df, thats for picking the below point of each data
+    points = pd.DataFrame(count - error, columns=["foo"])
+    points = points[points["foo"] > 0]
 
-        # filtering to see the precursors for GRB090510
-        self.count = self.count[(-20 < self.count.index) & (self.count.index < 20)]
-        self.error = self.error[(-20 < self.error.index) & (self.error.index < 20)]
+    esik_sayaci = 0
+    count_list = []
+    for i in range(len(points.index)):
+        try:
+            fark = points.index.values[i + 1] - points.index.values[i]
+            if fark < 0.130:
+                esik_sayaci += 1
+                if points.index.values[i] not in count_list:
 
-        self.points = pd.DataFrame(self.count - self.error, columns=["foo"])
-        self.points = self.points[self.points["foo"] > 0]
-        # print(self.points)
-        esik_sayaci = 0
-        count_list = []
-        for i in range(len(self.points.index)):
-            try:
-                fark = self.points.index.values[i + 1] - self.points.index.values[i]
-                if fark < 0.130:
-                    esik_sayaci += 1
-                    if self.points.index.values[i] not in count_list:
+                    count_list.append(points.index.values[i])
+                # print(points.index.values[i + 1], points.index.values[i])
+                if 4 > esik_sayaci > 1:
 
-                        count_list.append(self.points.index.values[i])
-                    # print(self.points.index.values[i + 1], self.points.index.values[i])
-                    if 4 > esik_sayaci > 1:
-                        print(count_list, end="\n\n")
-                else:
-                    esik_sayaci = 0
-                    count_list = []
-            except:
-                pass
+                    count_list = [
+                        i + 0.128 if i == max(count_list) else i for i in count_list
+                    ]
+                    count_list = [
+                        i - 0.128 if i == min(count_list) else i for i in count_list
+                    ]
+                    for i in count_list:
+                        if i < 0:
+                            # print(i)
+                            pass
+                        else:
+                            count_list = []
+                    x = [plt.axvline(x=i, color="r") for i in count_list]
+                    plt.axvspan(
+                        min(count_list),
+                        max(count_list),
+                        color="r",
+                        alpha=0.2,
+                    )
+            else:
+                esik_sayaci = 0
+                count_list = []
+        except:
+            pass
 
-        # plt.scatter((self.higher_p.index - 0.065), self.higher_p.values, color="r")
-        # plt.step(self.count.index, self.count.values)
-        # plt.axhline(y=0, color="r")
-        # plt.errorbar(
-        #     (self.count.index - 0.065),
-        #     self.count.values,
-        #     yerr=self.error.values,
-        #     ls="none",
-        #     ecolor="black",
-        #     elinewidth=0.5,
-        # )
-        # plt.show()
+    # plt.scatter((higher_p.index - 0.065), higher_p.values, color="r")
+    if plot == True:
+        plt.step(count.index, count.values)
+        # print(count_list)
+
+        # print(min(i))
+        plt.axhline(y=0, color="r")
+        plt.errorbar(
+            (count.index - 0.065),
+            count.values,
+            yerr=error.values,
+            ls="none",
+            ecolor="black",
+            elinewidth=0.5,
+        )
+        plt.show()
+    if returns == True:
+        return pd.DataFrame(count - error)
 
 
-# lc_reader("GRB090510/msec128.lc")
-
-from waveFunctions import wavelet
+# df = lc_reader("GRB090510/msec128.lc", plot=False, returns=True)
 
 
-hdul = fits.open("GRB090510/msec128.lc")
+def wave_analysis(GRB):
+    hdul = fits.open(GRB)
+    trigger_t = hdul[1].header["TRIGTIME"]
+    NGOODPIX = hdul[1].header["NGOODPIX"]
 
-# getting trigger time from header
-trigger_t = hdul[1].header["TRIGTIME"]
+    df = pd.DataFrame(hdul[1].data)
 
-# we need to multuply the count rates with NGOODPIX value
-# its a must EXPLAIN IT LATER
+    df["TIME"] = df["TIME"] - trigger_t  # time values
 
-NGOODPIX = hdul[1].header["NGOODPIX"]
+    count = df["RATE"]  # count values
+    error = df["ERROR"]  # error values
 
-# creating dataframe to work on the data better
-df = pd.DataFrame(hdul[1].data)
+    count.index = df["TIME"]
+    error.index = df["TIME"]
 
-# time values
-df["TIME"] = df["TIME"] - trigger_t
+    count = count * NGOODPIX
+    error = error * NGOODPIX
 
-# count values
-count = df["RATE"]
-count.index = df["TIME"]
+    count = count[(-20 < count.index) & (count.index < 20)]
+    error = error[(-20 < error.index) & (error.index < 20)]
 
-# error values
-error = df["ERROR"]
-error.index = df["TIME"]
+    points = pd.DataFrame(count - error, columns=["foo"])
+    points = points[points["foo"] > 0]
+    xx = [float(i) for i in points.values]
 
-count = count * NGOODPIX
-error = error * NGOODPIX
+    # wavelet(Y, 0.128, pad=0, dj=-1, s0=-1, J1=-1, mother="MORLET", param=6, freq=None):
+    wave, period, scale, coi = wavelet(xx, 0.128)
 
-# filtering to see the precursors for GRB090510
-count = count[(-20 < count.index) & (count.index < 20)]
-error = error[(-20 < error.index) & (error.index < 20)]
+    # wave_signif(Y,dt,scale,sigtest=0,lag1=0.0,siglvl=0.95,dof=None,mother="MORLET",param=None,gws=None)
+    signif = wave_signif(wave, 0.128, scale)
 
-points = pd.DataFrame(count - error, columns=["foo"])
-points = points[points["foo"] > 0]
-xx = [float(i) for i in points.values]
-# wavelet(Y, 0.128, pad=0, dj=-1, s0=-1, J1=-1, mother="MORLET", param=6, freq=None):
-yy = wavelet(xx, 0.128)
+    # print(signif.shape)
+    # scale = np.linspace(0.256, 4, 13)
 
-# print(yy[3])
-# for i in yy:
-#     print(i.shape, end="\n\n\n")
-plt.plot(yy[0])
-plt.show()
+    wave = (np.absolute(wave)) ** 2
+    signif = wave_signif(points.index, 0.128, scale)
+    # print(signif)
+    # print(wave)
+
+    plt.contour(points.index, scale, wave)
+    # plt.plot(signif)
+    # plt.ylim(top=4)
+    plt.show()
+
+
+# plot between 2*0.128 and 4
+
+# sig %95
+wave_analysis("GRB090510/msec128.lc")
+
+
+# print(df)
