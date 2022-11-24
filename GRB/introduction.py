@@ -150,6 +150,3 @@ def wave_analysis(GRB):
 
 # sig %95
 wave_analysis("GRB090510/msec128.lc")
-
-
-# print(df)
