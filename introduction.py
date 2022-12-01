@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from waveFunctions import wavelet, wave_signif
 
+import matplotlib
+
 
 def fits2df(fits_path, error=True, time_index=True, NGOODPIX=True, TRIGGERTIME=True):
     # this function created to read fits functions and make DataFrame out of it
@@ -45,8 +47,8 @@ def lc_reader(path, plot=True, returns=False):
 
     count = df["RATE"]
     error = df["ERROR"]
-    count = count[(-20 < count.index) & (count.index < 20)]
-    error = error[(-20 < error.index) & (error.index < 20)]
+    count = count[(-20 < count.index) & (count.index < 0)]
+    error = error[(-20 < error.index) & (error.index < 0)]
 
     # creating new df, thats for picking the below point of each data
     values = pd.DataFrame(count - error, columns=["Values"])
@@ -133,43 +135,68 @@ def wave_analysis(GRB):
     xx = [float(i) for i in points]
 
     # wavelet(Y, 0.128, pad=0, dj=-1, s0=-1, J1=-1, mother="MORLET", param=6, freq=None):
-    wave, period, scale, coi = wavelet(xx, 0.128)
-    wave = (np.absolute(wave)) ** 2
+    sst = sst - np.mean(sst)
+    variance = np.std(sst, ddof=1) ** 2
+    print("variance = ", variance)
+
+    # ----------C-O-M-P-U-T-A-T-I-O-N------S-T-A-R-T-S------H-E-R-E---------------
+
+    variance = 1.0
+    sst = sst / np.std(sst, ddof=1)
     n = len(sst)
-    # wave_signif(Y,dt,scale,sigtest=0,lag1=0.0,siglvl=0.95,dof=None,mother="MORLET",param=None,gws=None)
-    signif = wave_signif(wave, 0.128, scale=scale)
-    print(signif)
-    # sig95 = signif[:, np.newaxis].dot(np.ones(n)[np.newaxis, :])
-    # sig95 = wave / sig95
+    dt = 0.25
+    # time = np.arange(len(sst)) * dt  # construct time array
+    time = points.index
+    # xlim = [1870, 2000]  # plotting range
+    pad = 1  # 0 is default
+    dj = 0.25
+    s0 = 2 * dt
+    j1 = np.fix((np.log(n * dt / s0) / np.log(2)) / dj)
+    # j1 = 7 / dj
+    lag1 = 0.72  # lag-1 autocorrelation for red noise background
+    mother = "MORLET"
 
-    # limitations
-    # sig95 = sig95[:13]
-    # wave = wave[:13, :]
-    # period = period[:13]
-    # coi = coi[:13]
+    # Wavelet transform:
+    wave, period, scale, coi = wavelet(sst, dt, pad, dj, s0, j1, mother)
+    power = (np.abs(wave)) ** 2  # compute wavelet power spectrum
+
+    # Significance levels:
+    signif = wave_signif(
+        ([variance]), dt=dt, sigtest=0, scale=scale, lag1=lag1, mother=mother
+    )  # try with and without lag1 value
     # scale = np.linspace(0.256, 4, 13)
-    # time = points.index
+    # signif = signif[:13]
+    # power = power[:13, :]
+    # period = period[:13]
+    sig95 = signif[:, np.newaxis].dot(np.ones(n)[np.newaxis, :])
+    sig95 = power / sig95  # where ratio > 1, power is significant
 
-    contour = plt.contourf(points.index, scale, wave)
-    # plt.fill_between(
-    #     time,
-    #     coi * 0 + period[-1],
-    #     coi,
-    #     facecolor="none",
-    #     edgecolor="#00000040",
-    #     hatch="x",
-    # )
-    plt.gca().invert_yaxis()
-    plt.plot(points.index, coi, "k")
-    plt.ylabel("scale")
-    plt.xlabel("time")
-    plt.title("GRB090510 Wavelet Analysis \n(Morlet Mothre Function)")
-    # plt.plot(signif)
-    # plt.ylim(top=4)
-    # plt.show()
+    # ------------------------------------------------------ Plotting
+
+    # --- Contour plot wavelet power spectrum
+    CS = plt.contourf(time, period, power)
+    # im = plt.contourf(CS, colors=["white", "bisque", "orange", "orangered", "darkred"])
+    # 95# significance contour, levels at -99 (fake) and 1 (95# signif)
+    plt.contour(time, period, sig95, [-99, 1], colors="k")
+    # cone-of-influence, anything "below" is dubious
+    plt.fill_between(
+        time,
+        coi * 0 + period[-1],
+        coi,
+        facecolor="none",
+        edgecolor="#00000040",
+        hatch="x",
+    )
+    plt.plot(time, coi, "k")
+    # format y-scale
+    plt.yscale("log", base=2, subs=None)
+    plt.ylim([np.min(period), np.max(period)])
+    ax = plt.gca()
+    ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    plt.ticklabel_format(axis="y", style="plain")
+    ax.invert_yaxis()
+
+    plt.show()
 
 
-# plot between 2*0.128 and 4
-
-# sig %95
 wave_analysis("GRB090510/msec128.lc")
