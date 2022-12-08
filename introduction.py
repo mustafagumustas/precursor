@@ -6,12 +6,12 @@ import numpy as np
 from waveFunctions import wavelet, wave_signif
 
 import matplotlib
-from astrosc import fits2df, lc_plotter
+from astrosc import fits2df, lc_plotter, waveanalysis, wave_contour_plot
 
 
 def lc_reader(path, plot=True, returns=False):
     df = fits2df(path, real_value=True, time_index=True, TRIGGERTIME=True)
-    df = df.loc[-20:20]
+    df = df.loc[-240:0]
     # creating new df, thats for picking the below point of each data
     values = pd.DataFrame(df["RATE"] - df["ERROR"], columns=["Values"])
     values = values[values["Values"] > 0]
@@ -26,10 +26,9 @@ def lc_reader(path, plot=True, returns=False):
                 if fark < 0.130:
                     esik_sayaci += 1
                     if values.index.values[i] not in count_list:
-
                         count_list.append(values.index.values[i])
                     # print(values.index.values[i + 1], values.index.values[i])
-                    if esik_sayaci > 1:
+                    if 4 > esik_sayaci > 1:
 
                         count_list = [
                             i + 0.128 if i == max(count_list) else i for i in count_list
@@ -39,7 +38,6 @@ def lc_reader(path, plot=True, returns=False):
                         ]
                         for i in count_list:
                             if i < 0:
-                                # print(i)
                                 pass
                             else:
                                 count_list = []
@@ -63,16 +61,15 @@ def lc_reader(path, plot=True, returns=False):
     )
 
 
-# df = lc_reader("GRB090510/msec128.lc", plot=True, returns=True)
+df = lc_reader("GRB090510/msec128.lc", plot=True, returns=True)
 
 
 def wave_analysis(GRB):
     df = fits2df(GRB, real_value=True, time_index=True, TRIGGERTIME=True)
-    df = df.loc[-20:20]
+    df = df.loc[-240:5]
     points = df["VALUES"]
-    points = points[points.values > 0]
-    xx = [float(i) for i in points]
-    sst = xx
+    # points = points[points.values > 0]
+    sst = [float(i) for i in points]
     sst = sst - np.mean(sst)
 
     # ----------C-O-M-P-U-T-A-T-I-O-N------S-T-A-R-T-S------H-E-R-E---------------
@@ -117,7 +114,6 @@ def wave_analysis(GRB):
 
     # --- Contour plot wavelet power spectrum
     plt.contourf(time, period, power)
-
     plt.contour(time, period, sig95, [-99, 1], colors="k")
     # cone-of-influence, anything "below" is dubious
     plt.fill_between(
@@ -140,4 +136,22 @@ def wave_analysis(GRB):
     plt.show()
 
 
-wave_analysis("GRB090510/msec128.lc")
+# df = fits2df(
+#     "GRB081024A/msec128.lc", real_value=True, time_index=True, TRIGGERTIME=True
+# )
+# df = df.loc[-240:5]
+# points = df["VALUES"]
+# time, period, power, sig95, coi = waveanalysis(points, points.index)
+# # wave_contour_plot(time, period, power, sig95, coi)
+
+# wave_analysis("GRB081024A/msec128.lc")
+# plt.show()
+
+# df = fits2df(
+#     "GRB081024A/msec128.lc", real_value=True, time_index=True, TRIGGERTIME=True
+# )
+# df = df.loc[-50:0]
+# lc_plotter(df, df["RATE"], error=True)
+
+
+# lc_reader("GRB081024A/msec128.lc", plot=True)
