@@ -36,14 +36,14 @@ def fits2df(
         # fixing time values, making trigger at 0
         df["TIME"] = df["TIME"] - trigger_t  # time values
 
-    NGOODPIX = hdul[1].header["NGOODPIX"]  # NGOODPIX value
+    # NGOODPIX = hdul[1].header["NGOODPIX"]  # NGOODPIX value
     # we need to multuply the count rates with NGOODPIX value
     # in order to get the real values, its a must
-    df["RATE"] = df["RATE"] * NGOODPIX
+    # df["RATE"] = df["RATE"] * NGOODPIX
 
     if real_value:
         # subtract error from count values and add new col to df as values
-        df["ERROR"] = df["ERROR"] * NGOODPIX
+        # df["ERROR"] = df["ERROR"] * NGOODPIX
         df["VALUES"] = df["RATE"] - df["ERROR"]
 
     if time_index:
@@ -72,16 +72,6 @@ def lc_plotter(df, x, error=False):
             elinewidth=0.5,
         )
     plt.show()
-
-
-# df = fits2df("GRB090510/msec128.lc", real_value=True, time_index=True, TRIGGERTIME=True)
-
-
-# lc_plotter(
-#     df,
-#     df["RATE"],
-#     error=True,
-# )
 
 
 def waveanalysis(df, time, mother="MORLET"):
@@ -154,3 +144,24 @@ def wave_contour_plot(time, period, power, sig95, coi):
     ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
     plt.ticklabel_format(axis="y", style="plain")
     ax.invert_yaxis()
+
+
+def new_wave(df, signal, scales, waveletname, dt):
+    time = df.index
+
+
+# hdul = fits.open("GRB090510/msec128_ucuncu.lc")
+# count = pd.DataFrame([i[1] for i in hdul[1].data])
+# time = pd.DataFrame([i[0] for i in hdul[1].data])
+# TRIGTIME = hdul[1].header["TRIGTIME"]
+# time = time - TRIGTIME
+
+# # creating count and error values in DF
+# count = pd.DataFrame([i[1] for i in hdul[1].data], index=time[0])
+
+# # plt.step(count.index, count[0])
+# total = count[0]+count[1]+count[2]+count[3]
+# # print(total)
+# total = total.loc[-20:0]
+# plt.step(total.index, total)
+# plt.show()
